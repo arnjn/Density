@@ -4,15 +4,15 @@ import matplotlib.pyplot as plt
 
 print("Start")
 
-def calculate_density(position, grid ,grid_spacing=1.5):
+def calculate_density(position, grid ,grid_spacing=2.5):
     val = 0
     g = grid
     for coordinates in position:
         #a =  np.linalg.norm(abs(g-coordinates))
-        
         if np.linalg.norm(abs(g - coordinates))/grid_spacing <= 1:
             num = np.dot(g-coordinates,g-coordinates)
-            e = np.exp(-1/(1-(num/grid_spacing**2)))
+            a = (num/grid_spacing)
+            e = np.exp(-1/(1-a**2))
             val += e
         else:
             val += 0
@@ -22,55 +22,51 @@ def calculate_density(position, grid ,grid_spacing=1.5):
 
 
 traj = ase.io.read("C:/Users/sande/Desktop/lammps/flow/rand.dump" , format='lammps-dump-text',index=':')
-x_den = []
-y_den = []
-z_den = []
-grid_spacing = 1.5
-x_range = np.arange(0, 25.0, grid_spacing)
-y_range = np.arange(0, 30.0, grid_spacing)
-z_range = np.arange(0, 5.0, grid_spacing)
-grid = np.array(np.meshgrid(x_range,y_range,z_range)).T.reshape(-1,3)
-grid_val = np.array(np.meshgrid(x_range,y_range,z_range)).T.reshape(-1,3)
-grid_val[:] = 0
+grid_spacing = 2.5
+den = np.zeros((10,12,2))
+d = []
 i = 0
+frame = traj[0]
+positions = frame.get_scaled_positions()
+for z in range(0,2):
+    for x in range(0,10):
+        for y in range(0,12):
+            print(y)
+            grid = [(x)*grid_spacing, (y)*grid_spacing,(z)*grid_spacing]
+            den[x,y,z] += calculate_density(positions, grid ,grid_spacing)
+# for frame in traj:
+#     print(i)
+#     #frame = traj[frame]
+#     i = i+1
+#     positions = frame.get_scaled_positions()
+#     for z in range(0,2):
+#         for x in range(0,10):
+#             for y in range(0,12):
+#                 grid = [x*grid_spacing, y*grid_spacing,z*grid_spacing]
+#                 den[x,y,z] = calculate_density(positions, grid ,grid_spacing)
+    
+#     d.append(np.sum(den))
 
-for frame in traj:
-    print(i)
-    i = i+1
-    positions = frame.get_scaled_positions()
+x = np.arange(2.5, 25.1, 2.5)
 
-    for g, gval in zip(grid,grid_val):
-        gval += calculate_density(positions,g)
+# Arrange y from 0 to 30 by 2.5
+y = np.arange(2.5, 30.1, 2.5)
 
-    x = sum(grid_val[:, 0])/len(grid_val[:, 0])
-    y = sum(grid_val[:, 1])/len(grid_val[:, 1])
-    z = sum(grid_val[:, 2])/len(grid_val[:, 2])
-    x_den.append(x)
-    y_den.append(y)
-    z_den.append(z)
+# Create a meshgrid for x and y
+X, Y = np.meshgrid(x, y)
 
+# Plot a 2D contour plot with z-values always 1
+plt.contour(X, Y, den[:, :, 1].T, levels=[1], colors='k')
 
-avg_den = [a + b + c for a, b, c in zip(x_den, y_den, z_den)]
-plt.figure(1)
-plt.plot(x_den)
-plt.xlabel("Time step")
-plt.ylabel("X axis density")
+# Set labels and title
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.title('2D Contour Plot with z=1')
+
+# # Show the plot
 plt.show()
 
-plt.figure(2)
-plt.plot(y_den)
-plt.xlabel("Time step")
-plt.ylabel("Y axis density")
-plt.show()
 
-plt.figure(3)
-plt.plot(z_den)
-plt.xlabel("Time step")
-plt.ylabel("Z axis density")
-plt.show()
 
-plt.figure(4)
-plt.plot(avg_den)
-plt.ylabel("total density")
-plt.xlabel("Time steps")
-plt.show()
+
+    
