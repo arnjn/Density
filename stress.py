@@ -1,90 +1,83 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.linalg import eigvals
 import ase.io
-from scipy.ndimage import gaussian_filter
 
+# Placeholder function for calculating stress tensor and Reynolds stress tensor
+def calculate_stress_tensor(positions, forces, box_volume):
+    num_particles = len(positions)
+    stress_tensor = np.zeros((nx, ny, nz, 3, 3))  # 3D stress tensor based on grid points
 
-# Read LAMMPS trajectory using ASE
+    for i in range(3):
+        for j in range(i, 3):
+            stress_tensor[:, :, :, i, j] = np.sum(positions[:, i] * forces[:, j]) + np.sum(positions[:, j] * forces[:, i])
+            if i == j:
+                stress_tensor[:, :, :, i, j] += np.sum([np.dot(f, r) for f, r in zip(forces, positions)])
+            stress_tensor[:, :, :, i, j] /= box_volume
+            stress_tensor[:, :, :, j, i] = stress_tensor[:, :, :, i, j]  # stress tensor is symmetric
+
+    return stress_tensor
+
+def calculate_reynolds_stress_tensor(positions, forces, velocities, box_volume):
+    num_particles = len(positions)
+    reynolds_stress_tensor = np.zeros((nx, ny, nz, 3, 3))  # 3D Reynolds stress tensor based on grid points
+
+    for i in range(3):
+        for j in range(i, 3):
+            reynolds_stress_tensor[:, :, :, i, j] = np.sum(positions[:, i] * forces[:, j]) + np.sum(positions[:, j] * forces[:, i])
+            reynolds_stress_tensor[:, :, :, i, j] /= box_volume
+            reynolds_stress_tensor[:, :, :, j, i] = reynolds_stress_tensor[:, :, :, i, j]  # reynolds stress tensor is symmetric
+    
+    for i in range(3):
+        for j in range(i, 3):
+            reynolds_stress_tensor[:, :, :, i, j] -= np.sum(velocities[:, i] * velocities[:, j])
+            reynolds_stress_tensor[:, :, :, j, i] = reynolds_stress_tensor[:, :, :, i, j]  # reynolds stress tensor is symmetric
+
+    return reynolds_stress_tensor
+
+# Placeholder function for interactive analysis of eigenvalues at selected grid points
+def interactive_analysis(grid_points, stress_tensor, reynolds_stress_tensor):
+    for grid_point in grid_points:
+        stress_tensor_point = stress_tensor[grid_point[0], grid_point[1], grid_point[2]]
+        reynolds_stress_tensor_point = reynolds_stress_tensor[grid_point[0], grid_point[1], grid_point[2]]
+        diff_tensor = stress_tensor_point - reynolds_stress_tensor_point
+        eigenvalues = np.linalg.eigvals(diff_tensor)
+        print(f"Eigenvalues at grid point {grid_point}: {eigenvalues}")
+
+# Example usage:
+nx, ny, nz = 10, 10, 10  # Number of grid points along x, y, z axes
+
+# Assume positions, forces, velocities, and box_volume are obtained from simulation data
 traj = ase.io.read("C:/Users/sande/Desktop/lammps/flow/10size.dump", format='lammps-dump-text', index=':')
 
-# Define grid parameters and initialize grid arrays
-nx, ny, nz = 100, 100, 100  # Number of grid points along x, y, z axes
-stress_tensor = np.zeros((nx, ny, nz, 3, 3))  # Assuming a 3x3 stress tensor
-reynolds_stress_tensor = np.zeros((nx, ny, nz, 3, 3))  # Assuming a 3x3 Reynolds stress tensor
+# Replace these placeholders with actual data from your simulation
+x_e = []
+y_e = []
+z_e = []
+d = 5
+positions = traj[d].get_positions()  # Example positions of 200 particles in 3D space
+forces = traj[d].get_forces()        # Example forces acting on the particles
+velocities = traj[d].get_velocities()  # Example velocities of the particles
+box_volume = 1093500  # Example box volume
 
-# Assuming 'grid_point' is the grid point you are interested in (e.g., grid_point = (i, j, k))
+# Calculate stress tensor and Reynolds stress tensor
+stress_tensor = calculate_stress_tensor(positions, forces, box_volume)
+reynolds_stress_tensor = calculate_reynolds_stress_tensor(positions, forces, velocities, box_volume)
 
-# Initialize lists to store eigenvalues and time steps
-eigenvalues_list = []
-time_steps = []
+# Calculate stress tensor along each axis
+stress_tensor_x = np.sum(stress_tensor, axis=(1, 2, 3))
+stress_tensor_y = np.sum(stress_tensor, axis=(0, 2, 3))
+stress_tensor_z = np.sum(stress_tensor, axis=(0, 1, 3))
 
-# Print available keys in the trajectory to check for stress tensor data
-print("Available keys in trajectory arrays:")
-for key in traj[0].arrays.keys():
-    print(key)
+print("-------------x----------------")
+print(stress_tensor_x[0][0])
+print("-------------Y----------------")
+print(stress_tensor_y[0][1])
+print("-------------Z----------------")
+print(stress_tensor_z[0][2])
 
-# Loop through each frame in the trajectory
-for idx, frame in enumerate(traj):
-    # Check if 'virial' array is available in the frame
-    if 'virial' in frame.arrays:
-        # Get stress tensor components from the frame
-        stress_components = frame.arrays['virial']
+# Choose one or more grid points (replace with actual grid indices)
+grid_points = [(0, 1, 0), (3, 3, 3), (5, 5, 5)]
 
-        # Calculate stress tensor at each grid point based on atomic positions and stress components
-        for atom_pos, stress_comp in zip(frame.get_positions(), stress_components):
-            # Calculate grid indices based on atomic positions
-            i, j, k = int(atom_pos[0] / (lx / nx)), int(atom_pos[1] / (ly / ny)), int(atom_pos[2] / (lz / nz))
+# Perform interactive analysis
+interactive_analysis(grid_points, stress_tensor, reynolds_stress_tensor)
 
-            # Assign stress tensor components to the corresponding grid point
-            stress_tensor[i, j, k] += stress_comp.reshape((3, 3))
-
-# Optionally, perform smoothing on the stress tensor and Reynolds stress tensor data
-smoothed_stress_tensor = gaussian_filter(stress_tensor, sigma=1)
-
-# Loop through each frame in the trajectory again to calculate Reynolds stress tensor
-for idx, frame in enumerate(traj):
-    if 'virial' in frame.arrays:
-        # Calculate Reynolds stress tensor based on stress tensor components
-        for i in range(nx):
-            for j in range(ny):
-                for k in range(nz):
-                    reynolds_stress_tensor[i, j, k] += stress_tensor[i, j, k]  # Example: Assigning stress tensor for Reynolds stress (adjust as per your calculation)
-
-# Check if stress tensor and Reynolds stress tensor data are available
-if np.any(stress_tensor) and np.any(reynolds_stress_tensor):
-    # Loop through each frame in the trajectory again to calculate eigenvalues at the specified grid point
-    for idx, frame in enumerate(traj):
-        # Get stress tensor and Reynolds stress tensor values at the specified grid point
-        stress_tensor_point = smoothed_stress_tensor[grid_point[0], grid_point[1], grid_point[2]]
-        reynolds_stress_tensor_point = smoothed_reynolds_stress_tensor[grid_point[0], grid_point[1], grid_point[2]]
-
-        # Calculate the difference between stress tensor and Reynolds stress tensor
-        diff_tensor = stress_tensor_point - reynolds_stress_tensor_point
-
-        # Calculate eigenvalues of the difference tensor
-        eigenvalues = eigvals(diff_tensor)
-
-        # Append eigenvalues to the list
-        eigenvalues_list.append(eigenvalues)
-        
-        # Append time step to the list (assuming each frame corresponds to a time step)
-        time_steps.append(idx)
-
-    # Convert lists to NumPy arrays for plotting
-    eigenvalues_array = np.array(eigenvalues_list)
-    time_steps_array = np.array(time_steps)
-
-    # Plot eigenvalues through time
-    plt.figure()
-    for i in range(len(eigenvalues_array[0])):
-        plt.plot(time_steps_array, eigenvalues_array[:, i], label=f'Eigenvalue {i+1}')
-
-    # Set labels and title
-    plt.xlabel('Time Step')
-    plt.ylabel('Eigenvalues')
-    plt.title('Eigenvalues of Stress Tensor - Reynolds Stress Tensor')
-    plt.legend()
-    plt.show()
-else:
-    print("Stress tensor or Reynolds stress tensor data not available in the trajectory.")
