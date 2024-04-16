@@ -53,31 +53,35 @@ traj = ase.io.read("C:/Users/sande/Desktop/lammps/flow/10size.dump", format='lam
 x_e = []
 y_e = []
 z_e = []
-d = 5
-positions = traj[d].get_positions()  # Example positions of 200 particles in 3D space
-forces = traj[d].get_forces()        # Example forces acting on the particles
-velocities = traj[d].get_velocities()  # Example velocities of the particles
 box_volume = 1093500  # Example box volume
 
-# Calculate stress tensor and Reynolds stress tensor
-stress_tensor = calculate_stress_tensor(positions, forces, box_volume)
-reynolds_stress_tensor = calculate_reynolds_stress_tensor(positions, forces, velocities, box_volume)
+# Iterate through each frame in traj
+for frame in traj:
+    positions = frame.get_positions()  # Example positions of 200 particles in 3D space
+    forces = frame.get_forces()        # Example forces acting on the particles
+    velocities = frame.get_velocities()  # Example velocities of the particles
+    
+    # Calculate stress tensor and Reynolds stress tensor for the current frame
+    stress_tensor = calculate_stress_tensor(positions, forces, box_volume)
+    reynolds_stress_tensor = calculate_reynolds_stress_tensor(positions, forces, velocities, box_volume)
 
-# Calculate stress tensor along each axis
-stress_tensor_x = np.sum(stress_tensor, axis=(1, 2, 3))
-stress_tensor_y = np.sum(stress_tensor, axis=(0, 2, 3))
-stress_tensor_z = np.sum(stress_tensor, axis=(0, 1, 3))
+    # Calculate stress tensor along each axis for the current frame
+    stress_tensor_x = np.sum(stress_tensor, axis=(1, 2, 3))
+    stress_tensor_y = np.sum(stress_tensor, axis=(0, 2, 3))
+    stress_tensor_z = np.sum(stress_tensor, axis=(0, 1, 3))
 
-print("-------------x----------------")
-print(stress_tensor_x[0][0])
-print("-------------Y----------------")
-print(stress_tensor_y[0][1])
-print("-------------Z----------------")
-print(stress_tensor_z[0][2])
+    # Append x_e, y_e, and z_e values for the current frame
+    x_e.append(stress_tensor_x[0][0])  # Adjust indices based on your stress tensor shape
+    y_e.append(stress_tensor_y[0][1])
+    z_e.append(stress_tensor_z[0][2])
 
-# Choose one or more grid points (replace with actual grid indices)
-grid_points = [(0, 1, 0), (3, 3, 3), (5, 5, 5)]
-
-# Perform interactive analysis
-interactive_analysis(grid_points, stress_tensor, reynolds_stress_tensor)
-
+# Plotting x_e, y_e, and z_e values over simulation time
+time_steps = np.arange(len(traj))
+plt.plot(time_steps, x_e, label='Stress Tensor along X-axis')
+plt.plot(time_steps, y_e, label='Stress Tensor along Y-axis')
+plt.plot(time_steps, z_e, label='Stress Tensor along Z-axis')
+plt.xlabel('Simulation Time')
+plt.ylabel('Stress Tensor Values')
+plt.title('Stress Tensor Variation Over Time')
+plt.legend()
+plt.show()
